@@ -437,7 +437,7 @@ export interface ApiActiveUserActiveUser extends Struct.CollectionTypeSchema {
 export interface ApiChatSessionChatSession extends Struct.CollectionTypeSchema {
   collectionName: 'chat_sessions';
   info: {
-    displayName: 'Chat session';
+    displayName: 'Chat Session';
     pluralName: 'chat-sessions';
     singularName: 'chat-session';
   };

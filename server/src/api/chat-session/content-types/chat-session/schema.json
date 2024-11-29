@@ -4,7 +4,7 @@
   "info": {
     "singularName": "chat-session",
     "pluralName": "chat-sessions",
-    "displayName": "Chat session"
+    "displayName": "Chat Session"
   },
   "options": {
     "draftAndPublish": true

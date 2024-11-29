@@ -14,6 +14,29 @@ module.exports = {
     });
 
     io.on("connection", function (socket) {
+      socket.on("fetchMessages", async (chatSessionId) => {
+        try {
+          const chatMessages = await strapi.entityService.findMany(
+            "api::message.message",
+            {
+              populate: "*",
+            },
+          );
+          console.log("chat messages");
+
+          console.log(chatMessages);
+
+          const filteredMessages = chatMessages.filter((message) => {
+            return message.chatSession.id === chatSessionId;
+          });
+          console.log(filteredMessages);
+
+          // io.emit("messages", filteredMessage);
+          callback(filteredMessages);
+        } catch (error) {
+          console.error("Error saving message:", error);
+        }
+      });
       socket.on("sendMessage", async (message) => {
         // Validate message
         if (!message || !message.content) {
@@ -44,22 +67,39 @@ module.exports = {
       });
 
       socket.on("createOrJoinRoom", async (data) => {
-        console.log(data);
-
         const createOrJoinRoomData = {
           participants: data.participants,
         };
 
         try {
           console.log("Saving the chat session data to Strapi");
-          const savedChatSession = await strapi.entityService.create(
+          const chatSessions = await strapi.entityService.findMany(
             "api::chat-session.chat-session",
             {
-              data: createOrJoinRoomData,
+              populate: "*",
             },
           );
 
-          // io.emit("newMessage", savedMessage);
+          const matchingSessions = chatSessions.filter((chat) => {
+            return (
+              chat.participants[0].id ===
+                createOrJoinRoomData.participants[0] &&
+              chat.participants[1].id === createOrJoinRoomData.participants[1]
+            );
+          });
+
+          if (matchingSessions.length === 0) {
+            const savedChatSession = await strapi.entityService.create(
+              "api::chat-session.chat-session",
+              {
+                data: createOrJoinRoomData,
+              },
+            );
+            io.emit("newChatSession", savedChatSession);
+          } else {
+            const existingSession = matchingSessions[0];
+            io.emit("existingSession", existingSession);
+          }
         } catch (error) {
           console.error("Error saving chat session:", error);
         }
