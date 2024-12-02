@@ -24,7 +24,7 @@
     },
     "content": {
       "type": "string",
-      "required": true 
+      "required": true
     },
     "sender": {
       "type": "relation",
@@ -37,6 +37,11 @@
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user",
       "inversedBy": "received_messages"
+    },
+    "chatSession": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::chat-session.chat-session"
     }
   }
 }

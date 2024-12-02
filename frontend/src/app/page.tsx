@@ -1,27 +1,19 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import useFetchChatSessions from "@/hooks/use-fetch-chat-sessions";
 import useFetchStrapiUsers from "@/hooks/use-fetch-users";
 import { useLogout } from "@/hooks/use-logout";
 import { useUser } from "@/hooks/use-user";
 import socket from "@/socket-io";
-import { createOrJoinRoomData } from "@/types/create-or-join-room";
+import { ChatSession } from "@/types/chat-session";
 import { User } from "@/types/login-user";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type ChatMessage = {
-  type: string;
-  content: string;
-  sender: number;
-  receiver: number;
-};
-
 export default function Home() {
-  const [data, setData] = useState<ChatMessage[]>([]);
+  const router = useRouter();
   const { data: strapiUsers } = useFetchStrapiUsers();
-  const { data: chatSessions } = useFetchChatSessions();
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+
   console.log("chat session");
   console.log(chatSessions);
   const currentUser = useUser();
@@ -30,64 +22,59 @@ export default function Home() {
     (strapiUser: User) => strapiUser.id !== currentUser?.id
   );
 
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    socket.on("newMessage", (incomingMessage: ChatMessage) => {
-      setData((prev) => [...prev, incomingMessage]);
-    });
-
-    return () => {
-      socket.off("newMessage");
-    };
-  }, []);
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!message.trim()) return;
-    if (!currentUser) {
-      console.error("User is not logged in");
-      return;
-    }
-
-    const messageData: ChatMessage = {
-      type: "text",
-      content: message,
-      sender: currentUser.id,
-      receiver: currentUser.id,
-    };
-
-    socket.emit("sendMessage", messageData);
-    setMessage("");
-  };
   const { logout } = useLogout();
 
   const handleLogout = () => {
     logout();
   };
 
-  // const joinOrCrepateRoomMutation = useJoinOrCreateRoomMutation({
-  //   onSuccess: (data) => {
-  //     console.log("success", data);
-  //   },
-  //   onError: (error: AxiosError<ErrorResponse>) => {
-  //     console.log("error", error);
-  //   },
-  // });
+  useEffect(() => {
+    socket.on("newChatSession", (newSession) => {
+      setChatSessions((prev) => [...prev, newSession]);
+      router.push(`/chat/${newSession.id}`);
+    });
 
-  const handleJoinOrCreateRoom = (receiverId: number) => {
+    socket.on("existingSession", (existingSession) => {
+      router.push(`/chat/${existingSession.id}`);
+    });
+
+    return () => {
+      socket.off("newChatSession");
+      socket.off("existingSession");
+    };
+  }, [router]);
+
+  const handleJoinOrCreateRoom = async (targetId: number) => {
     if (!currentUser) {
-      console.error("Current user is not logged in.");
       return;
     }
+    // Determine if it's an existing session or a new user
+    const isExistingSession = chatSessions?.some(
+      (session) => session.id === targetId
+    );
 
-    const createOrJoinRoomData: createOrJoinRoomData = {
-      participants: [currentUser.id, receiverId],
-    };
+    if (isExistingSession) {
+      // If it's an existing session, join that specific session
+      const existingSession = chatSessions.find(
+        (session) => session.id === targetId
+      );
 
-    socket.emit("createOrJoinRoom", createOrJoinRoomData);
-    // setMessage("");
+      if (existingSession) {
+        socket.emit("joinRoom", {
+          sessionId: existingSession.id,
+          participants: existingSession.participants.map((p) => p.id),
+        });
+        router.push(`/chat/${existingSession.id}`);
+        return;
+      }
+    } else {
+      // If it's a new user, create a new session
+      const newSessionParticipants = [currentUser.id, targetId];
+
+      socket.emit("createOrJoinRoom", {
+        participants: newSessionParticipants,
+      });
+    }
   };
 
   return (
@@ -96,14 +83,32 @@ export default function Home() {
 
       <h1>List of users</h1>
 
-      {usersWithoutCurrentUser?.map((user: User) => (
-        <div key={user.id}>
-          <button onClick={() => handleJoinOrCreateRoom(user.id)}>
-            {user?.username}
+      {chatSessions?.map((session: ChatSession) => (
+        <div key={session.id}>
+          <button
+            onClick={() => handleJoinOrCreateRoom(session.id)}
+            className="w-full text-left p-2 hover:bg-gray-100"
+          >
+            Chat with{" "}
+            {
+              session?.participants.find((p) => p.id !== currentUser?.id)
+                ?.username
+            }
           </button>
         </div>
       ))}
 
+      <h1>New Users</h1>
+      {usersWithoutCurrentUser?.map((user: User) => (
+        <div key={user.id}>
+          <button
+            onClick={() => handleJoinOrCreateRoom(user.id)}
+            className="w-full text-left p-2 hover:bg-gray-100"
+          >
+            Start Chat with {user.username}
+          </button>
+        </div>
+      ))}
       <div className="my-4">
         {currentUser ? (
           <div>
@@ -118,44 +123,6 @@ export default function Home() {
             <br />
             <a href="/register">register</a>
           </div>
-        )}
-      </div>
-
-      {currentUser ? (
-        <form onSubmit={handleSubmit} className="mb-4">
-          <label htmlFor="message" className="block mb-2 text-sm font-medium">
-            Message
-          </label>
-          <Input
-            type="text"
-            name="message"
-            placeholder="Type your message"
-            className="w-full p-2 border border-gray-300 rounded-md text-black"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <Button
-            variant={"secondary"}
-            type="submit"
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          >
-            Send Message
-          </Button>
-        </form>
-      ) : (
-        <p className="text-red-500">Login to send messages.</p>
-      )}
-
-      <h2 className="text-lg font-semibold">Chat Messages</h2>
-      <div className="mt-4">
-        {data.length > 0 ? (
-          data.map((msg, index) => (
-            <div key={`${msg.sender}-${index}`} className="mb-2">
-              <span className="font-bold">{msg.sender}</span>: {msg.content}
-            </div>
-          ))
-        ) : (
-          <p>No messages yet.</p>
         )}
       </div>
     </div>

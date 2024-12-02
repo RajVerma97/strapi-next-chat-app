@@ -477,6 +477,10 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    chatSession: Schema.Attribute.Relation<
+      'oneToOne',
+      'api::chat-session.chat-session'
+    >;
     content: Schema.Attribute.String & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
