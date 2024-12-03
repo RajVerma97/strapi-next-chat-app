@@ -1,62 +1,77 @@
 "use client";
-
-import useFetchStrapiUsers from "@/hooks/use-fetch-users";
-import { useLogout } from "@/hooks/use-logout";
+import { useState, useEffect } from "react";
 import { useUser } from "@/hooks/use-user";
+import { useLogout } from "@/hooks/use-logout";
+import useFetchStrapiUsers from "@/hooks/use-fetch-users";
 import socket from "@/socket-io";
 import { ChatSession } from "@/types/chat-session";
 import { User } from "@/types/login-user";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 
 export default function Home() {
   const router = useRouter();
   const { data: strapiUsers } = useFetchStrapiUsers();
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  console.log("chat session");
-  console.log(chatSessions);
   const currentUser = useUser();
+  const { logout } = useLogout();
 
   const usersWithoutCurrentUser = strapiUsers?.filter(
     (strapiUser: User) => strapiUser.id !== currentUser?.id
   );
 
-  const { logout } = useLogout();
-
-  const handleLogout = () => {
-    logout();
-  };
-
   useEffect(() => {
-    socket.on("newChatSession", (newSession) => {
+    if (!currentUser) return;
+
+    const handleNewChatSession = (newSession: ChatSession) => {
       setChatSessions((prev) => [...prev, newSession]);
       router.push(`/chat/${newSession.id}`);
-    });
+    };
 
-    socket.on("existingSession", (existingSession) => {
+    const handleExistingSession = (existingSession: ChatSession) => {
       router.push(`/chat/${existingSession.id}`);
-    });
+    };
+
+    const handleChatSessionError = (errorData: { message: string }) => {
+      setError(errorData.message);
+      console.error("Chat Session Error:", errorData.message);
+    };
+
+    const handleFetchedSessions = (sessions: ChatSession[]) => {
+      setChatSessions(sessions);
+    };
+
+    socket.on("newChatSession", handleNewChatSession);
+    socket.on("existingSession", handleExistingSession);
+    socket.on("chatSessionError", handleChatSessionError);
+    socket.on("fetchedSessions", handleFetchedSessions);
+    // socket.on("roomJoined", handleRoomJoined);
+
+    socket.emit("fetchSessions", { userId: currentUser.id });
 
     return () => {
-      socket.off("newChatSession");
-      socket.off("existingSession");
+      socket.off("newChatSession", handleNewChatSession);
+      socket.off("existingSession", handleExistingSession);
+      socket.off("chatSessionError", handleChatSessionError);
+      socket.off("fetchedSessions", handleFetchedSessions);
+      // socket.off("roomJoined", handleRoomJoined);
     };
-  }, [router]);
+  }, [currentUser, router]);
 
   const handleJoinOrCreateRoom = async (targetId: number) => {
     if (!currentUser) {
+      setError("Please log in to start a chat");
       return;
     }
-    // Determine if it's an existing session or a new user
-    const isExistingSession = chatSessions?.some(
-      (session) => session.id === targetId
+
+    const isExistingSession = chatSessions?.some((session) =>
+      session.participants.some((p) => p.id === targetId)
     );
 
     if (isExistingSession) {
-      // If it's an existing session, join that specific session
-      const existingSession = chatSessions.find(
-        (session) => session.id === targetId
+      const existingSession = chatSessions.find((session) =>
+        session.participants.some((p) => p.id === targetId)
       );
 
       if (existingSession) {
@@ -64,11 +79,11 @@ export default function Home() {
           sessionId: existingSession.id,
           participants: existingSession.participants.map((p) => p.id),
         });
+
         router.push(`/chat/${existingSession.id}`);
         return;
       }
     } else {
-      // If it's a new user, create a new session
       const newSessionParticipants = [currentUser.id, targetId];
 
       socket.emit("createOrJoinRoom", {
@@ -77,200 +92,110 @@ export default function Home() {
     }
   };
 
+  const handleLogout = () => {
+    logout();
+  };
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-100 text-red-800">
+        <p>{error}</p>
+        <button
+          onClick={() => setError(null)}
+          className="mt-2 px-4 py-2 bg-red-500 text-white rounded"
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold">Chat Application 3</h1>
+    <div className=" min-h-screen bg-gradient-to-r from-purple-400 to-indigo-400 text-black ">
+      <div className="bg-white p-4 max-w-md mx-auto">
+        <h1 className="text-2xl font-bold mb-4">Chat Application</h1>
 
-      <h1>List of users</h1>
+        <section className="mb-6">
+          <h2 className="text-xl font-semibold mb-2">Existing Chats</h2>
+          {chatSessions.length === 0 ? (
+            <p className="text-gray-500">No existing chat sessions</p>
+          ) : (
+            <div className="space-y-2">
+              {chatSessions.map((session) => (
+                <div key={session.id} className="bg-gray-100 rounded">
+                  <button
+                    onClick={() =>
+                      handleJoinOrCreateRoom(
+                        session.participants.find(
+                          (p) => p.id !== currentUser?.id
+                        )?.id ?? 0
+                      )
+                    }
+                    className="w-full text-left p-2 hover:bg-gray-200 rounded transition"
+                  >
+                    Chat with{" "}
+                    {
+                      session.participants.find((p) => p.id !== currentUser?.id)
+                        ?.username
+                    }
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
-      {chatSessions?.map((session: ChatSession) => (
-        <div key={session.id}>
-          <button
-            onClick={() => handleJoinOrCreateRoom(session.id)}
-            className="w-full text-left p-2 hover:bg-gray-100"
-          >
-            Chat with{" "}
-            {
-              session?.participants.find((p) => p.id !== currentUser?.id)
-                ?.username
-            }
-          </button>
+        <section>
+          <h2 className="text-xl font-semibold mb-2">Start New Chat</h2>
+          {usersWithoutCurrentUser?.length === 0 ? (
+            <p className="text-gray-500">No other users available</p>
+          ) : (
+            <div className="space-y-2">
+              {usersWithoutCurrentUser?.map((user: User) => (
+                <div key={user.id} className="bg-gray-100 rounded">
+                  <button
+                    onClick={() => handleJoinOrCreateRoom(user.id)}
+                    className="w-full text-left p-2 hover:bg-gray-200 rounded transition"
+                  >
+                    Start Chat with {user.username}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <div className="mt-6 p-4 bg-gray-50 rounded">
+          {currentUser ? (
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Your Profile</h3>
+              <p className="mb-1">Username: {currentUser.username}</p>
+              <p className="mb-4">Email: {currentUser.email}</p>
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <a
+                href="/login"
+                className="block w-full px-4 py-2 text-center bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+              >
+                Login
+              </a>
+              <a
+                href="/register"
+                className="block w-full px-4 py-2 text-center bg-green-500 text-white rounded hover:bg-green-600 transition"
+              >
+                Register
+              </a>
+            </div>
+          )}
         </div>
-      ))}
-
-      <h1>New Users</h1>
-      {usersWithoutCurrentUser?.map((user: User) => (
-        <div key={user.id}>
-          <button
-            onClick={() => handleJoinOrCreateRoom(user.id)}
-            className="w-full text-left p-2 hover:bg-gray-100"
-          >
-            Start Chat with {user.username}
-          </button>
-        </div>
-      ))}
-      <div className="my-4">
-        {currentUser ? (
-          <div>
-            <p>Username: {currentUser.username}</p>
-            <p>Email: {currentUser.email}</p>
-
-            <button onClick={handleLogout}>logout</button>
-          </div>
-        ) : (
-          <div>
-            <a href="/login">login</a>
-            <br />
-            <a href="/register">register</a>
-          </div>
-        )}
       </div>
     </div>
   );
 }
-
-// import React, { useState, useEffect, useRef } from "react";
-// import { Card, CardContent, CardFooter } from "@/components/ui/card";
-// import { Input } from "@/components/ui/input";
-// import { Button } from "@/components/ui/button";
-
-// const ChatInterface = ({ user, socket }) => {
-//   const [messages, setMessages] = useState([]);
-//   const [currentMessage, setCurrentMessage] = useState("");
-//   const [sessions, setSessions] = useState([]);
-//   const [currentSession, setCurrentSession] = useState(null);
-//   const messagesEndRef = useRef(null);
-
-//   useEffect(() => {
-//     // Fetch user's chat sessions from Strapi
-//     const fetchSessions = async () => {
-//       try {
-//         // Replace with your actual Strapi API call
-//         const response = await fetch(`/api/chat-sessions?user=${user.id}`);
-//         const data = await response.json();
-//         setSessions(data);
-//       } catch (error) {
-//         console.error("Failed to fetch sessions", error);
-//       }
-//     };
-
-//     // WebSocket message handling
-//     const handleSocketMessage = (event) => {
-//       const message = JSON.parse(event.data);
-//       setMessages((prev) => [...prev, message]);
-//     };
-
-//     if (socket) {
-//       socket.addEventListener("message", handleSocketMessage);
-//     }
-
-//     fetchSessions();
-
-//     return () => {
-//       if (socket) {
-//         socket.removeEventListener("message", handleSocketMessage);
-//       }
-//     };
-//   }, [user, socket]);
-
-//   // Scroll to bottom when messages update
-//   useEffect(() => {
-//     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-//   }, [messages]);
-
-//   const handleSendMessage = async () => {
-//     if (currentMessage.trim() && socket) {
-//       const messageData = {
-//         content: currentMessage,
-//         user: user.id,
-//         session: currentSession?.id,
-//         timestamp: new Date().toISOString(),
-//       };
-
-//       // Send message via WebSocket
-//       socket.send(JSON.stringify(messageData));
-
-//       // Save message to Strapi
-//       try {
-//         await fetch("/api/messages", {
-//           method: "POST",
-//           headers: {
-//             "Content-Type": "application/json",
-//           },
-//           body: JSON.stringify(messageData),
-//         });
-//       } catch (error) {
-//         console.error("Failed to save message", error);
-//       }
-
-//       setCurrentMessage("");
-//     }
-//   };
-
-//   const createNewSession = async () => {
-//     try {
-//       const response = await fetch("/api/chat-sessions", {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//         },
-//         body: JSON.stringify({
-//           user: user.id,
-//           title: `New Session ${sessions.length + 1}`,
-//           createdAt: new Date().toISOString(),
-//         }),
-//       });
-//       const newSession = await response.json();
-//       setSessions([...sessions, newSession]);
-//       setCurrentSession(newSession);
-//     } catch (error) {
-//       console.error("Failed to create new session", error);
-//     }
-//   };
-
-//   return (
-//     <Card className="w-full max-w-2xl mx-auto h-[600px] flex flex-col">
-//       <div className="flex border-b p-4">
-//         <div className="flex-grow">
-//           <h2 className="text-xl font-bold">
-//             {currentSession ? currentSession.title : "Select a Session"}
-//           </h2>
-//         </div>
-//         <Button variant="outline" onClick={createNewSession}>
-//           New Session
-//         </Button>
-//       </div>
-
-//       <CardContent className="flex-grow overflow-y-auto p-4">
-//         {messages.map((msg, index) => (
-//           <div
-//             key={index}
-//             className={`mb-2 p-2 rounded ${
-//               msg.user === user.id
-//                 ? "bg-blue-100 text-right self-end"
-//                 : "bg-gray-100 text-left self-start"
-//             }`}
-//           >
-//             {msg.content}
-//           </div>
-//         ))}
-//         <div ref={messagesEndRef} />
-//       </CardContent>
-
-//       <CardFooter className="border-t p-4">
-//         <div className="flex w-full space-x-2">
-//           <Input
-//             value={currentMessage}
-//             onChange={(e) => setCurrentMessage(e.target.value)}
-//             placeholder="Type a message..."
-//             onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-//             className="flex-grow"
-//           />
-//           <Button onClick={handleSendMessage}>Send</Button>
-//         </div>
-//       </CardFooter>
-//     </Card>
-//   );
-// };
-
-// export default ChatInterface;

@@ -3,5 +3,5 @@ interface ChatMessage {
   content: string;
   sender: number;
   receiver: number;
-  chatSession: ChatSession;
+  chatSession: number;
 }
