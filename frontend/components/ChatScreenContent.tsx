@@ -36,7 +36,7 @@ ChatScreenContentProps) {
         messages: ChatMessage[];
       }) => {
         console.log(`Room joined: ${sessionId}`);
-        setData(messages); // Set recent messages for this chat
+        setData(messages);
       }
     );
 
@@ -93,42 +93,91 @@ ChatScreenContentProps) {
   };
 
   return (
-    <div>
-      chat screen of {chatSessionId}
-      {currentUser ? (
-        <form onSubmit={handleSubmit} className="mb-4">
-          <label htmlFor="message" className="block mb-2 text-sm font-medium">
-            Message
-          </label>
-          <Input
-            type="text"
-            name="message"
-            placeholder="Type your message"
-            className="w-full p-2 border border-gray-300 rounded-md text-black"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <Button
-            variant={"secondary"}
-            type="submit"
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          >
-            Send Message
-          </Button>
-        </form>
-      ) : (
-        <p className="text-red-500">Login to send messages.</p>
-      )}
-      <h2 className="text-lg font-semibold">Chat Messages</h2>
-      <div className="mt-4">
-        {data.length === 0 ? (
-          <div>No messages</div>
-        ) : (
-          data?.map((msg, index) => (
-            <div key={`${msg.sender}-${index}`} className="mb-2">
-              <span className="font-bold">{}</span>: {msg.content}
+    <div className="min-h-screen flex justify-center items-center bg-gradient-to-r from-purple-600 to-indigo-700 text-black">
+      <div className="shadow-2xl rounded-xl overflow-hidden bg-white max-w-lg w-full p-6">
+        <h1 className="text-3xl font-bold mb-6 text-center text-black">
+          Chat Screen
+        </h1>
+        <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-3">
+          {data.length === 0 ? (
+            <div className="text-center text-gray-500 italic">
+              No messages yet
             </div>
-          ))
+          ) : (
+            data?.map((msg: ChatMessage, index) => (
+              <div
+                key={`${msg.sender}-${index}`}
+                className={`flex ${
+                  currentUser?.id !== msg.sender
+                    ? "justify-start"
+                    : "justify-end"
+                }`}
+              >
+                <span
+                  className={`
+                p-3 
+                rounded-2xl 
+                max-w-[70%] 
+                break-words 
+                inline-block 
+                shadow-sm
+                ${
+                  currentUser?.id !== msg.sender
+                    ? "bg-blue-400 text-white"
+                    : "bg-gray-200 text-black"
+                }
+              `}
+                >
+                  {msg.content}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+        {currentUser ? (
+          <form
+            onSubmit={handleSubmit}
+            className="mt-6 flex items-center space-x-4"
+          >
+            <Input
+              type="text"
+              name="message"
+              placeholder="Type your message"
+              className="
+            flex-grow 
+            p-3 
+            border-2 
+            border-indigo-200 
+            rounded-xl 
+            focus:outline-none 
+            focus:ring-2 
+            focus:ring-indigo-500 
+            text-gray-700
+          "
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+            <Button
+              type="submit"
+              className="
+            px-6 
+            py-3 
+            bg-indigo-600 
+            text-white 
+            rounded-xl 
+            hover:bg-indigo-700 
+            transition-colors 
+            duration-300 
+            ease-in-out
+          "
+            >
+              Send
+            </Button>
+          </form>
+        ) : (
+          <p className="text-center text-red-500 mt-4">
+            Please log in to send messages
+          </p>
         )}
       </div>
     </div>
