@@ -42,9 +42,13 @@ export default function Home() {
     const handleNewChatSession = (newSession: ChatSession) => {
       const updatedId = newSession.id - 1;
       const chatSessionId = updatedId?.toString() || "";
-      const receiverName = (
-        newSession.participants[1]?.username || ""
-      ).toString();
+      if (!currentUser) {
+        throw new Error("user not logged in");
+      }
+      const receivers: User[] = newSession.participants.filter((user: User) => {
+        return user.id !== currentUser.id;
+      });
+      const receiverName = (receivers[0].username || "").toString();
 
       const serializedUrl = `/chat?chatSessionId=${encodeURIComponent(
         chatSessionId
@@ -54,11 +58,21 @@ export default function Home() {
     };
 
     const handleExistingChatSession = (existingSession: ChatSession) => {
+      if (!currentUser) {
+        throw new Error("user not logged in");
+      }
+
+      const receivers: User[] = existingSession.participants.filter(
+        (user: User) => {
+          return user.id !== currentUser.id;
+        }
+      );
+      const receiverName = (receivers[0].username || "").toString();
+
       const serializedUrl = `/chat?chatSessionId=${encodeURIComponent(
         existingSession.id
-      )}&receiverName=${encodeURIComponent(
-        existingSession.participants[1].username
-      )}`;
+      )}&receiverName=${encodeURIComponent(receiverName)}`;
+      console.log(existingSession);
 
       router.push(serializedUrl);
     };

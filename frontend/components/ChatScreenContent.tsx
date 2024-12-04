@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/hooks/use-user";
 import socket from "@/socket-io";
+import { ChatMessage, ChatMessageDb } from "@/types/chat-message";
 import React from "react";
 import { useEffect, useState } from "react";
 
@@ -15,19 +16,19 @@ export default function ChatScreenContent({
   chatSessionId,
   receiverName,
 }: ChatScreenContentProps) {
-  const [data, setData] = useState<ChatMessage[]>([]);
+  const [data, setData] = useState<ChatMessageDb[]>([]);
 
   const [message, setMessage] = useState("");
   const currentUser = useUser();
 
   useEffect(() => {
-    socket.on("newMessage", (incomingMessage: ChatMessage) => {
+    socket.on("newMessage", (incomingMessage: ChatMessageDb) => {
       setData((prev) => [...prev, incomingMessage]);
     });
 
     socket.emit("fetchMessages", chatSessionId);
 
-    socket.on("fetchedMessages", (messages: ChatMessage[]) => {
+    socket.on("fetchedMessages", (messages: ChatMessageDb[]) => {
       setData(messages);
     });
 
@@ -35,7 +36,7 @@ export default function ChatScreenContent({
       socket.off("newMessage");
       socket.off("fetchedMessages");
     };
-  }, [chatSessionId]);
+  });
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +65,7 @@ export default function ChatScreenContent({
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-gradient-to-r from-purple-600 to-indigo-700 text-black">
+    <div className=" p-8 min-h-screen flex justify-center items-center bg-gradient-to-r from-purple-600 to-indigo-700 text-black">
       <div className="shadow-2xl rounded-xl overflow-hidden bg-white max-w-lg w-full p-6">
         <h1 className="text-3xl font-bold mb-6 text-center text-black">
           {receiverName}
@@ -75,13 +76,13 @@ export default function ChatScreenContent({
               No messages yet
             </div>
           ) : (
-            data?.map((msg: ChatMessage, index) => (
+            data?.map((msg: ChatMessageDb, index) => (
               <div
                 key={`${msg.sender}-${index}`}
                 className={`flex ${
-                  currentUser?.id == msg.sender
-                    ? "justify-start"
-                    : "justify-end"
+                  currentUser?.id == msg.sender?.id
+                    ? "justify-end"
+                    : "justify-start"
                 }`}
               >
                 <span
@@ -93,9 +94,9 @@ export default function ChatScreenContent({
                 inline-block
                 shadow-sm
                 ${
-                  currentUser?.id == msg.sender
-                    ? "bg-gray-200 text-black"
-                    : "bg-blue-400 text-white"
+                  currentUser?.id == msg.sender?.id
+                    ? "bg-blue-400 text-white"
+                    : "bg-gray-200 text-black"
                 }
               `}
                 >
