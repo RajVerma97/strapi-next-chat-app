@@ -40,8 +40,9 @@
     },
     "chatSession": {
       "type": "relation",
-      "relation": "oneToOne",
-      "target": "api::chat-session.chat-session"
+      "relation": "manyToOne",
+      "target": "api::chat-session.chat-session",
+      "inversedBy": "messages"
     }
   }
 }

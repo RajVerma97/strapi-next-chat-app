@@ -9,52 +9,25 @@ import { useEffect, useState } from "react";
 
 interface ChatScreenContentProps {
   chatSessionId: string;
+  receiverName?: string;
 }
 export default function ChatScreenContent({
   chatSessionId,
-}: //   messages,
-ChatScreenContentProps) {
+  receiverName,
+}: ChatScreenContentProps) {
   const [data, setData] = useState<ChatMessage[]>([]);
 
   const [message, setMessage] = useState("");
   const currentUser = useUser();
 
   useEffect(() => {
-    console.log("insdie the useefeefect");
-
-    return () => {};
-  }, [chatSessionId]);
-
-  useEffect(() => {
-    socket.on(
-      "roomJoined",
-      ({
-        sessionId,
-        messages,
-      }: {
-        sessionId: string;
-        messages: ChatMessage[];
-      }) => {
-        console.log(`Room joined: ${sessionId}`);
-        setData(messages);
-      }
-    );
-
-    return () => {
-      socket.off("roomJoined");
-    };
-  }, []);
-
-  useEffect(() => {
     socket.on("newMessage", (incomingMessage: ChatMessage) => {
-      console.log("Client: New message received", incomingMessage);
       setData((prev) => [...prev, incomingMessage]);
     });
 
     socket.emit("fetchMessages", chatSessionId);
 
     socket.on("fetchedMessages", (messages: ChatMessage[]) => {
-      console.log("Received messages:", messages);
       setData(messages);
     });
 
@@ -69,12 +42,12 @@ ChatScreenContentProps) {
 
     if (!message.trim()) return;
     if (!currentUser) {
-      console.error("User is not logged in");
+      throw new Error("user is not logged in ");
       return;
     }
 
     if (!chatSessionId) {
-      console.log("no chat session id");
+      throw new Error("no chat session id");
       return;
     }
 
@@ -85,8 +58,6 @@ ChatScreenContentProps) {
       receiver: currentUser.id,
       chatSession: Number(chatSessionId),
     };
-    console.log("messages data");
-    console.log(messageData);
 
     socket.emit("sendMessage", messageData);
     setMessage("");
@@ -96,7 +67,7 @@ ChatScreenContentProps) {
     <div className="min-h-screen flex justify-center items-center bg-gradient-to-r from-purple-600 to-indigo-700 text-black">
       <div className="shadow-2xl rounded-xl overflow-hidden bg-white max-w-lg w-full p-6">
         <h1 className="text-3xl font-bold mb-6 text-center text-black">
-          Chat Screen
+          {receiverName}
         </h1>
         <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-3">
           {data.length === 0 ? (
@@ -108,23 +79,23 @@ ChatScreenContentProps) {
               <div
                 key={`${msg.sender}-${index}`}
                 className={`flex ${
-                  currentUser?.id !== msg.sender
+                  currentUser?.id == msg.sender
                     ? "justify-start"
                     : "justify-end"
                 }`}
               >
                 <span
                   className={`
-                p-3 
-                rounded-2xl 
-                max-w-[70%] 
-                break-words 
-                inline-block 
+                p-3
+                rounded-2xl
+                max-w-[70%]
+                break-words
+                inline-block
                 shadow-sm
                 ${
-                  currentUser?.id !== msg.sender
-                    ? "bg-blue-400 text-white"
-                    : "bg-gray-200 text-black"
+                  currentUser?.id == msg.sender
+                    ? "bg-gray-200 text-black"
+                    : "bg-blue-400 text-white"
                 }
               `}
                 >
@@ -144,14 +115,14 @@ ChatScreenContentProps) {
               name="message"
               placeholder="Type your message"
               className="
-            flex-grow 
-            p-3 
-            border-2 
-            border-indigo-200 
-            rounded-xl 
-            focus:outline-none 
-            focus:ring-2 
-            focus:ring-indigo-500 
+            flex-grow
+            p-3
+            border-2
+            border-indigo-200
+            rounded-xl
+            focus:outline-none
+            focus:ring-2
+            focus:ring-indigo-500
             text-gray-700
           "
               value={message}
@@ -160,14 +131,14 @@ ChatScreenContentProps) {
             <Button
               type="submit"
               className="
-            px-6 
-            py-3 
-            bg-indigo-600 
-            text-white 
-            rounded-xl 
-            hover:bg-indigo-700 
-            transition-colors 
-            duration-300 
+            px-6
+            py-3
+            bg-indigo-600
+            text-white
+            rounded-xl
+            hover:bg-indigo-700
+            transition-colors
+            duration-300
             ease-in-out
           "
             >

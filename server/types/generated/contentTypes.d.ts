@@ -437,6 +437,7 @@ export interface ApiActiveUserActiveUser extends Struct.CollectionTypeSchema {
 export interface ApiChatSessionChatSession extends Struct.CollectionTypeSchema {
   collectionName: 'chat_sessions';
   info: {
+    description: '';
     displayName: 'Chat Session';
     pluralName: 'chat-sessions';
     singularName: 'chat-session';
@@ -454,6 +455,7 @@ export interface ApiChatSessionChatSession extends Struct.CollectionTypeSchema {
       'api::chat-session.chat-session'
     > &
       Schema.Attribute.Private;
+    messages: Schema.Attribute.Relation<'oneToMany', 'api::message.message'>;
     participants: Schema.Attribute.Relation<
       'oneToMany',
       'plugin::users-permissions.user'
@@ -478,7 +480,7 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
   };
   attributes: {
     chatSession: Schema.Attribute.Relation<
-      'oneToOne',
+      'manyToOne',
       'api::chat-session.chat-session'
     >;
     content: Schema.Attribute.String & Schema.Attribute.Required;

@@ -4,7 +4,8 @@
   "info": {
     "singularName": "chat-session",
     "pluralName": "chat-sessions",
-    "displayName": "Chat Session"
+    "displayName": "Chat Session",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -15,6 +16,12 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "plugin::users-permissions.user"
+    },
+    "messages": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::message.message",
+      "mappedBy": "chatSession"
     }
   }
 }

@@ -8,33 +8,6 @@ import { ChatSession } from "@/types/chat-session";
 import { User } from "@/types/login-user";
 import { useRouter } from "next/navigation";
 
-interface ChatSessionButtonProps {
-  session: ChatSession;
-  currentUserId: number | undefined;
-  onJoinRoom: (targetId: number) => void;
-}
-
-function ChatSessionButton({
-  session,
-  currentUserId,
-  onJoinRoom,
-}: ChatSessionButtonProps) {
-  const otherParticipant = session.participants.find(
-    (p) => p.id !== currentUserId
-  );
-
-  return (
-    <div className="rounded p-2">
-      <button
-        onClick={() => onJoinRoom(otherParticipant?.id ?? 0)}
-        className="w-14 h-14 bg-gray-200 hover:bg-gray-300 rounded-full flex justify-center items-center transition"
-      >
-        {otherParticipant?.username}
-      </button>
-    </div>
-  );
-}
-
 interface ChatUserButtonProps {
   user: User;
   onClick: (targetId: number) => void;
@@ -55,7 +28,7 @@ function ChatUserButton({ user, onClick }: ChatUserButtonProps) {
 export default function Home() {
   const router = useRouter();
   const { data: strapiUsers } = useFetchStrapiUsers();
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [, setChatSessions] = useState<ChatSession[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const currentUser = useUser();
@@ -66,16 +39,39 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!currentUser) return;
-
     const handleNewChatSession = (newSession: ChatSession) => {
-      setChatSessions((prev) => [...prev, newSession]);
-      router.push(`/chat/${newSession.id}`);
+      const updatedId = newSession.id - 1;
+      const chatSessionId = updatedId?.toString() || "";
+      const receiverName = (
+        newSession.participants[1]?.username || ""
+      ).toString();
+
+      const serializedUrl = `/chat?chatSessionId=${encodeURIComponent(
+        chatSessionId
+      )}&receiverName=${encodeURIComponent(receiverName)}`;
+
+      router.push(serializedUrl);
     };
 
-    const handleExistingSession = (existingSession: ChatSession) => {
-      router.push(`/chat/${existingSession.id}`);
+    const handleExistingChatSession = (existingSession: ChatSession) => {
+      const serializedUrl = `/chat?chatSessionId=${encodeURIComponent(
+        existingSession.id
+      )}&receiverName=${encodeURIComponent(
+        existingSession.participants[1].username
+      )}`;
+
+      router.push(serializedUrl);
     };
+    socket.on("newChatSession", handleNewChatSession);
+    socket.on("existingSession", handleExistingChatSession);
+    return () => {
+      socket.off("newChatSession", handleNewChatSession);
+      socket.off("existingSession", handleExistingChatSession);
+    };
+  });
+
+  useEffect(() => {
+    if (!currentUser) return;
 
     const handleChatSessionError = (errorData: { message: string }) => {
       setError(errorData.message);
@@ -86,16 +82,12 @@ export default function Home() {
       setChatSessions(sessions);
     };
 
-    socket.on("newChatSession", handleNewChatSession);
-    socket.on("existingSession", handleExistingSession);
     socket.on("chatSessionError", handleChatSessionError);
     socket.on("fetchedSessions", handleFetchedSessions);
 
     socket.emit("fetchSessions", { userId: currentUser.id });
 
     return () => {
-      socket.off("newChatSession", handleNewChatSession);
-      socket.off("existingSession", handleExistingSession);
       socket.off("chatSessionError", handleChatSessionError);
       socket.off("fetchedSessions", handleFetchedSessions);
     };
@@ -107,31 +99,11 @@ export default function Home() {
       return;
     }
 
-    const isExistingSession = chatSessions?.some((session) =>
-      session.participants.some((p) => p.id === targetId)
-    );
+    const participants = [currentUser?.id, targetId];
 
-    if (isExistingSession) {
-      const existingSession = chatSessions.find((session) =>
-        session.participants.some((p) => p.id === targetId)
-      );
-
-      if (existingSession) {
-        socket.emit("joinRoom", {
-          sessionId: existingSession.id,
-          participants: existingSession.participants.map((p) => p.id),
-        });
-
-        router.push(`/chat/${existingSession.id}`);
-        return;
-      }
-    } else {
-      const newSessionParticipants = [currentUser.id, targetId];
-
-      socket.emit("createOrJoinRoom", {
-        participants: newSessionParticipants,
-      });
-    }
+    socket.emit("createRoom", {
+      participants: participants,
+    });
   };
 
   const handleLogout = () => {
@@ -155,35 +127,11 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-purple-600 to-indigo-700 text-black">
+    <div className="p-6 min-h-screen flex items-center justify-center bg-gradient-to-r from-purple-600 to-indigo-700 text-black">
       <div className="bg-white p-8 rounded-xl max-w-md w-full shadow-2xl">
         <h1 className="text-3xl font-bold mb-6 text-center text-black">
           Chat Application
         </h1>
-
-        <section className="mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-black">
-            Existing Chats
-          </h2>
-          {chatSessions.length === 0 ? (
-            <p className="text-gray-500 text-center italic">
-              No existing chat sessions
-            </p>
-          ) : (
-            <div className="w-full">
-              <div className="grid grid-cols-4 justify-between gap-4">
-                {chatSessions?.map((session: ChatSession) => (
-                  <ChatSessionButton
-                    key={session.id}
-                    session={session}
-                    currentUserId={currentUser?.id}
-                    onJoinRoom={handleJoinOrCreateRoom}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
 
         <section>
           <h2 className="text-xl font-semibold mb-4 text-black">
