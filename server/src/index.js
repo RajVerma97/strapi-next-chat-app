@@ -56,7 +56,6 @@ module.exports = {
 
           socket.emit("newChatSession", newSession);
         } catch (error) {
-          console.error("Error creating/joining room:", error);
           socket.emit("chatSessionError", {
             message: "Failed to create or join room",
             error: error.toString(),
@@ -80,7 +79,6 @@ module.exports = {
 
           socket.emit("fetchedMessages", chatMessages);
         } catch (error) {
-          console.error("Error fetching messages:", error);
           socket.emit("fetchedMessages", []);
         }
       });
@@ -99,7 +97,6 @@ module.exports = {
 
       socket.on("sendMessage", async (message) => {
         if (!message.chatSession) {
-          console.error("Invalid chatSession provided:", message.chatSession);
           return;
         }
         if (!message || !message.content) {
@@ -141,8 +138,6 @@ module.exports = {
 
           socket.emit("newMessage", savedMessage);
         } catch (error) {
-          console.error("Error saving message:", error);
-          console.error("Error details:", JSON.stringify(error, null, 2));
           throw error;
         }
       });

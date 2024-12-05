@@ -72,8 +72,6 @@ export default function Home() {
       const serializedUrl = `/chat?chatSessionId=${encodeURIComponent(
         existingSession.id
       )}&receiverName=${encodeURIComponent(receiverName)}`;
-      console.log(existingSession);
-
       router.push(serializedUrl);
     };
     socket.on("newChatSession", handleNewChatSession);
@@ -89,7 +87,6 @@ export default function Home() {
 
     const handleChatSessionError = (errorData: { message: string }) => {
       setError(errorData.message);
-      console.error("Chat Session Error:", errorData.message);
     };
 
     const handleFetchedSessions = (sessions: ChatSession[]) => {
