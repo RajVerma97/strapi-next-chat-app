@@ -6,7 +6,10 @@ module.exports = {
   bootstrap() {
     var io = require("socket.io")(strapi.server.httpServer, {
       cors: {
-        origin: "http://localhost:3000",
+        origin: [
+          "https://strapi-next-chat-app.vercel.app",
+          "http://localhost:3000",
+        ],
         methods: ["GET", "POST"],
         allowedHeaders: ["my-custom-header"],
         credentials: true,
